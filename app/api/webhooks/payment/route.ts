@@ -78,6 +78,16 @@ export async function POST(request: Request) {
       // Still return 200 to prevent Stripe from retrying
     } else {
       console.log("[webhooks/payment] Purchase recorded for:", buyerEmail);
+      
+      // Proactively create an account / send invite so they can log in immediately
+      try {
+        await supabase.auth.admin.inviteUserByEmail(buyerEmail, {
+          redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/confirm`
+        });
+        console.log("[webhooks/payment] Sent invite to:", buyerEmail);
+      } catch (inviteErr) {
+        console.error("[webhooks/payment] Failed to send invite:", inviteErr);
+      }
     }
 
     return NextResponse.json({ received: true });
