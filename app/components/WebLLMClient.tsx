@@ -28,11 +28,6 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
   const engineRef = useRef<webllm.MLCEngine | null>(null);
   const startTimeRef = useRef<number>(0);
 
-  // Initialize on mount
-  useEffect(() => {
-    initModel();
-  }, []);
-
   // Timer for the pre-filling phase (before first token is generated)
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -46,31 +41,56 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
     return () => clearInterval(interval);
   }, [state, summary]);
 
-  async function initModel() {
-    setState("loading_model");
-    try {
-      // Check for WebGPU
-      if (!navigator.gpu) {
-        throw new Error("Your browser does not support WebGPU.");
+  // Initialize on mount
+  useEffect(() => {
+    let isMounted = true;
+
+    async function doInit() {
+      if (engineRef.current) return;
+      setState("loading_model");
+      try {
+        // Check for WebGPU
+        if (!navigator.gpu) {
+          throw new Error("Your browser does not support WebGPU.");
+        }
+
+        const initProgressCallback = (report: webllm.InitProgressReport) => {
+          if (isMounted) {
+            setProgressText(report.text);
+            setProgress(report.progress * 100);
+          }
+        };
+
+        const engine = new webllm.MLCEngine();
+        engine.setInitProgressCallback(initProgressCallback);
+        
+        await engine.reload(MODEL_ID);
+        
+        if (isMounted) {
+          engineRef.current = engine;
+          setState("empty_drop");
+        } else {
+          engine.unload();
+        }
+      } catch (err: any) {
+        if (isMounted) {
+          console.error("WebLLM Error:", err);
+          setState("error");
+          setErrorMsg(err.message || "Failed to initialize WebLLM.");
+        }
       }
-
-      const initProgressCallback = (report: webllm.InitProgressReport) => {
-        setProgressText(report.text);
-        setProgress(report.progress * 100);
-      };
-
-      const engine = new webllm.MLCEngine();
-      engine.setInitProgressCallback(initProgressCallback);
-      
-      await engine.reload(MODEL_ID);
-      engineRef.current = engine;
-      setState("empty_drop");
-    } catch (err: any) {
-      console.error("WebLLM Error:", err);
-      setState("error");
-      setErrorMsg(err.message || "Failed to initialize WebLLM.");
     }
-  }
+
+    doInit();
+
+    return () => {
+      isMounted = false;
+      if (engineRef.current) {
+        engineRef.current.unload();
+        engineRef.current = null;
+      }
+    };
+  }, []);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
