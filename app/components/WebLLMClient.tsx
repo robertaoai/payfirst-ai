@@ -9,7 +9,7 @@ import ReactMarkdown from "react-markdown";
 // We'll use the CDN link that matches the installed version.
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
-const MODEL_ID = "Llama-3.2-1B-Instruct-q4f16_1-MLC";
+const MODEL_ID = "Qwen2-0.5B-Instruct-q4f16_1-MLC";
 
 type AppState = "init" | "loading_model" | "empty_drop" | "file_loaded" | "summarizing" | "summary_ready" | "error";
 
@@ -212,7 +212,7 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
         <div className="w-16 h-16 rounded-full border-4 border-neutral-800 border-t-emerald-500 animate-spin" />
         <div className="text-center space-y-2">
           <h2 className="text-xl font-medium text-white">Loading Local AI Engine</h2>
-          <p className="text-sm text-neutral-400">Downloading Llama-3.2 (only happens once)</p>
+          <p className="text-sm text-neutral-400">Downloading Qwen2-0.5B (only happens once)</p>
         </div>
         <div className="w-full max-w-md bg-neutral-900 rounded-full h-3 overflow-hidden border border-white/5">
           <div 
