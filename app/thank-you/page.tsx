@@ -154,23 +154,49 @@ export default async function ThankYouPage({
           </p>
         </div>
 
-        <a
-          href="/"
-          style={{
-            display: "inline-block",
-            marginTop: "2rem",
-            padding: "0.75rem 2rem",
-            background: "rgba(255,255,255,0.06)",
-            border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: "10px",
-            color: "#aaaacc",
-            textDecoration: "none",
-            fontSize: "0.85rem",
-            fontWeight: 500,
-          }}
-        >
-          ← Back to home
-        </a>
+        <div style={{
+          display: "flex",
+          gap: "1rem",
+          justifyContent: "center",
+          marginTop: "2rem"
+        }}>
+          <a
+            href="/"
+            style={{
+              display: "inline-block",
+              padding: "0.75rem 2rem",
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: "10px",
+              color: "#aaaacc",
+              textDecoration: "none",
+              fontSize: "0.85rem",
+              fontWeight: 500,
+            }}
+          >
+            ← Back to home
+          </a>
+
+          {purchaseFound && sessionId && (
+            <a
+              href={`/app?token=${sessionId}`}
+              style={{
+                display: "inline-block",
+                padding: "0.75rem 2rem",
+                background: "linear-gradient(135deg, #34d399, #10b981)",
+                border: "1px solid rgba(52,211,153,0.3)",
+                borderRadius: "10px",
+                color: "#ffffff",
+                textDecoration: "none",
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                boxShadow: "0 4px 14px 0 rgba(16,185,129,0.39)",
+              }}
+            >
+              Open Summarizer →
+            </a>
+          )}
+        </div>
       </div>
     </main>
   );
