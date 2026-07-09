@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import WebLLMClient from "@/app/components/WebLLMClient";
+import { createClient } from "@/utils/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -8,14 +9,26 @@ export default async function AppRoute({
 }: {
   searchParams: Promise<{ token?: string }>;
 }) {
-  const params = await searchParams;
-  const token = params.token;
+  const supabaseAuth = await createClient();
+  const { data: { user } } = await supabaseAuth.auth.getUser();
 
-  // In Sprint 3, we simply gate by requiring *any* token parameter.
-  // In Sprint 4, this will be replaced with Supabase Auth validation.
-  if (!token) {
+  if (!user) {
+    redirect("/login");
+  }
+
+  // Check if they actually paid (RLS ensures they only see their own purchases)
+  const { data: purchases } = await supabaseAuth
+    .from("purchases")
+    .select("id, status")
+    .eq("status", "completed");
+
+  if (!purchases || purchases.length === 0) {
+    // If they logged in but haven't bought anything, redirect to landing page
     redirect("/");
   }
+
+  // Use the user ID or email as the session identifier for tracking
+  const sessionId = user.email || user.id;
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-[#0a0a1a] to-[#0a0a1a] text-neutral-200">
@@ -34,7 +47,7 @@ export default async function AppRoute({
           </div>
         </header>
 
-        <WebLLMClient session_id={token} />
+        <WebLLMClient session_id={sessionId} />
       </div>
     </main>
   );
