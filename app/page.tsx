@@ -11,6 +11,8 @@ export default function LandingPage() {
   );
   const [visitLogged, setVisitLogged] = useState(false);
   const [intentLogging, setIntentLogging] = useState(false);
+  const [email, setEmail] = useState("");
+  const [checkoutError, setCheckoutError] = useState("");
 
   // Log page visit on mount
   useEffect(() => {
@@ -61,9 +63,11 @@ export default function LandingPage() {
   }, [sessionId, visitLogged]);
 
   // Handle Buy click
-  async function handleBuyClick() {
+  async function handleBuyClick(e: React.FormEvent) {
+    e.preventDefault();
     if (intentLogging) return;
     setIntentLogging(true);
+    setCheckoutError("");
 
     try {
       // Log purchase intent
@@ -74,6 +78,7 @@ export default function LandingPage() {
           session_id: sessionId,
           price_cents: 2900,
           cta_label: "Get Private AI — $29",
+          email: email,
         }),
       });
 
@@ -81,22 +86,26 @@ export default function LandingPage() {
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId }),
+        body: JSON.stringify({ session_id: sessionId, email }),
       });
 
       const data = await res.json();
       if (data.url) {
         window.location.href = data.url;
       } else if (res.status === 503) {
-        alert("Payment system is being set up. Please try again shortly.");
+        setCheckoutError("Payment system is being set up. Please try again shortly.");
+        setIntentLogging(false);
+      } else if (data.error === "ALREADY_OWNED") {
+        setCheckoutError("You already own lifetime access! Please check your inbox for the magic link or sign in at the top right.");
         setIntentLogging(false);
       } else {
         console.error("No checkout URL returned:", data.error);
-        alert("Something went wrong. Please try again.");
+        setCheckoutError(data.error || "Something went wrong. Please try again.");
         setIntentLogging(false);
       }
     } catch (err) {
       console.error("Buy click failed:", err);
+      setCheckoutError("Network error. Please try again.");
       setIntentLogging(false);
     }
   }
@@ -233,29 +242,63 @@ export default function LandingPage() {
           <p style={{ fontSize: "0.85rem", color: "#7777aa", marginBottom: "1.25rem" }}>
             Lifetime access · No subscription · No data collection
           </p>
-          <button
-            onClick={handleBuyClick}
-            disabled={intentLogging}
-            style={{
-              padding: "1rem 3rem",
-              fontSize: "1.1rem",
-              fontWeight: 700,
-              color: "#fff",
-              background: intentLogging
-                ? "#555"
-                : "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
-              border: "none",
-              borderRadius: "12px",
-              cursor: intentLogging ? "wait" : "pointer",
-              boxShadow: intentLogging
-                ? "none"
-                : "0 4px 20px rgba(99,102,241,0.4), 0 0 60px rgba(99,102,241,0.15)",
-              transition: "all 0.2s ease",
-              letterSpacing: "0.01em",
-            }}
+          
+          <form 
+            onSubmit={handleBuyClick} 
+            style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem", maxWidth: "400px", margin: "0 auto" }}
           >
-            {intentLogging ? "Redirecting to checkout…" : "Get Private AI — $29"}
-          </button>
+            <input
+              type="email"
+              required
+              placeholder="Enter your email to buy"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              style={{
+                padding: "0.85rem 1.25rem",
+                fontSize: "1rem",
+                borderRadius: "12px",
+                border: "1px solid rgba(255,255,255,0.15)",
+                background: "rgba(0,0,0,0.3)",
+                color: "white",
+                width: "100%",
+                outline: "none",
+                transition: "border-color 0.2s",
+              }}
+              onFocus={(e) => e.target.style.borderColor = "#6366f1"}
+              onBlur={(e) => e.target.style.borderColor = "rgba(255,255,255,0.15)"}
+            />
+            
+            {checkoutError && (
+              <div style={{ color: "#ef4444", fontSize: "0.85rem", background: "rgba(239,68,68,0.1)", padding: "0.5rem", borderRadius: "8px", width: "100%" }}>
+                {checkoutError}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={intentLogging}
+              style={{
+                width: "100%",
+                padding: "1rem 2rem",
+                fontSize: "1.1rem",
+                fontWeight: 700,
+                color: "#fff",
+                background: intentLogging
+                  ? "#555"
+                  : "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+                border: "none",
+                borderRadius: "12px",
+                cursor: intentLogging ? "wait" : "pointer",
+                boxShadow: intentLogging
+                  ? "none"
+                  : "0 4px 20px rgba(99,102,241,0.4), 0 0 60px rgba(99,102,241,0.15)",
+                transition: "all 0.2s ease",
+                letterSpacing: "0.01em",
+              }}
+            >
+              {intentLogging ? "Redirecting to checkout…" : "Get Private AI"}
+            </button>
+          </form>
         </div>
 
         {/* Trust badges */}

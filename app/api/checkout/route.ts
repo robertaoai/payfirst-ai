@@ -1,5 +1,6 @@
 import { stripe, CONNECT_ACCOUNT_ID, PLATFORM_FEE_PERCENT } from "@/lib/stripe";
 import { NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
  * POST /api/checkout
@@ -18,8 +19,25 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { session_id } = body;
+    const { session_id, email } = body;
     const origin = request.headers.get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+
+    if (!email) {
+      return NextResponse.json({ error: "Email is required" }, { status: 400 });
+    }
+
+    // Check if they already purchased
+    const supabase = createAdminClient();
+    const { data: existingPurchase } = await supabase
+      .from("purchases")
+      .select("id")
+      .eq("buyer_email", email.toLowerCase().trim())
+      .limit(1)
+      .single();
+
+    if (existingPurchase) {
+      return NextResponse.json({ error: "ALREADY_OWNED" }, { status: 400 });
+    }
 
     // Build params for one-time $29 payment
     const params: any = {
@@ -38,6 +56,7 @@ export async function POST(request: Request) {
         },
       ],
       customer_creation: "always",
+      customer_email: email.toLowerCase().trim(),
       success_url: `${origin}/thank-you?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}`,
       metadata: {
