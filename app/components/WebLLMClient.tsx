@@ -13,6 +13,10 @@ const MODEL_ID = "Llama-3.2-1B-Instruct-q4f16_1-MLC";
 
 type AppState = "init" | "loading_model" | "empty_drop" | "file_loaded" | "summarizing" | "summary_ready" | "error";
 
+// Singleton engine to survive React re-renders and strict mode without WebGPU context loss
+let globalEngine: webllm.MLCEngine | null = null;
+let globalInitPromise: Promise<void> | null = null;
+
 export default function WebLLMClient({ session_id }: { session_id: string }) {
   const [state, setState] = useState<AppState>("init");
   const [progressText, setProgressText] = useState("");
@@ -46,10 +50,16 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
     let isMounted = true;
 
     async function doInit() {
-      if (engineRef.current) return;
+      // If already initialized globally, just use it
+      if (globalEngine) {
+        engineRef.current = globalEngine;
+        setState("empty_drop");
+        return;
+      }
+
       setState("loading_model");
+      
       try {
-        // Check for WebGPU
         if (!navigator.gpu) {
           throw new Error("Your browser does not support WebGPU.");
         }
@@ -61,16 +71,19 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
           }
         };
 
-        const engine = new webllm.MLCEngine();
-        engine.setInitProgressCallback(initProgressCallback);
+        if (!globalInitPromise) {
+          globalEngine = new webllm.MLCEngine();
+          globalEngine.setInitProgressCallback(initProgressCallback);
+          globalInitPromise = globalEngine.reload(MODEL_ID);
+        } else if (globalEngine) {
+          globalEngine.setInitProgressCallback(initProgressCallback);
+        }
+
+        await globalInitPromise;
         
-        await engine.reload(MODEL_ID);
-        
-        if (isMounted) {
-          engineRef.current = engine;
+        if (isMounted && globalEngine) {
+          engineRef.current = globalEngine;
           setState("empty_drop");
-        } else {
-          engine.unload();
         }
       } catch (err: any) {
         if (isMounted) {
@@ -78,6 +91,8 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
           setState("error");
           setErrorMsg(err.message || "Failed to initialize WebLLM.");
         }
+        globalInitPromise = null;
+        globalEngine = null;
       }
     }
 
@@ -85,10 +100,9 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
 
     return () => {
       isMounted = false;
-      if (engineRef.current) {
-        engineRef.current.unload();
-        engineRef.current = null;
-      }
+      // We purposefully DO NOT unload the engine here. 
+      // Keeping it as a global singleton prevents "Object has already been disposed"
+      // errors caused by React StrictMode double-unmounting or fast refresh.
     };
   }, []);
 
