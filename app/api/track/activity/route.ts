@@ -8,14 +8,17 @@ export async function POST(request: Request) {
 
     const supabase = createAdminClient();
     
-    // Insert activity row (anonymized usage metrics)
+    // Insert activity row matching the DB schema
     const { error } = await supabase
       .from("activities")
       .insert([
         {
-          session_id: session_id || "unknown",
-          word_count: word_count || 0,
-          duration_seconds: duration_seconds || 0,
+          action: "document_summarized",
+          detail: {
+            session_id: session_id || "unknown",
+            word_count: word_count || 0,
+            duration_seconds: duration_seconds || 0,
+          }
         },
       ]);
 
