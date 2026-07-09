@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import * as webllm from "@mlc-ai/web-llm";
 import * as pdfjsLib from "pdfjs-dist";
+import ReactMarkdown from "react-markdown";
 
 // Need to specify the worker src for PDF.js to work client-side.
 // We'll use the CDN link that matches the installed version.
@@ -22,6 +23,7 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
   const [summary, setSummary] = useState("");
   const [copied, setCopied] = useState(false);
   const [timeElapsed, setTimeElapsed] = useState(0);
+  const [totalDuration, setTotalDuration] = useState<number | null>(null);
   
   const engineRef = useRef<webllm.MLCEngine | null>(null);
   const startTimeRef = useRef<number>(0);
@@ -109,6 +111,7 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
     
     setState("summarizing");
     setSummary("");
+    setTotalDuration(null);
     startTimeRef.current = Date.now();
 
     try {
@@ -134,6 +137,7 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
 
       // Track activity anonymously
       const duration_seconds = Math.round((Date.now() - startTimeRef.current) / 1000);
+      setTotalDuration(duration_seconds);
       const word_count = fileContent.split(/\s+/).length;
       
       fetch("/api/track/activity", {
@@ -250,6 +254,11 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
           <div className="flex items-center justify-between mb-4 pb-4 border-b border-white/10">
             <h3 className="font-medium text-white flex items-center gap-2">
               ✨ Executive Summary
+              {totalDuration !== null && (
+                <span className="text-xs text-emerald-400 font-normal ml-2 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                  Completed in {totalDuration}s
+                </span>
+              )}
             </h3>
             {state === "summary_ready" && (
               <button 
@@ -261,7 +270,9 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
             )}
           </div>
           <div className="prose prose-invert max-w-none text-neutral-300 leading-relaxed min-h-[150px]">
-            {summary || (
+            {summary ? (
+              <ReactMarkdown>{summary}</ReactMarkdown>
+            ) : (
               <div className="flex flex-col gap-2 text-neutral-600 animate-pulse">
                 <span>Reading document...</span>
                 <span className="text-sm">This usually takes 10-30 seconds on the first run depending on your device. ({timeElapsed}s elapsed)</span>
