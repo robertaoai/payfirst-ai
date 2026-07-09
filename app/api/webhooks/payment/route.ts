@@ -57,8 +57,8 @@ export async function POST(request: Request) {
     // Get buyer email from the session
     const buyerEmail = session.customer_details?.email || session.customer_email || "unknown";
 
-    // Upsert to handle duplicate webhooks (idempotency on payment_provider_id)
-    const { error } = await supabase.from("purchases").upsert(
+    // Insert purchase (the DB's unique index on payment_provider_id will prevent duplicates)
+    const { error } = await supabase.from("purchases").insert(
       {
         buyer_email: buyerEmail,
         amount_cents: session.amount_total ?? 2900,
@@ -67,9 +67,6 @@ export async function POST(request: Request) {
         payment_provider_id: session.payment_intent as string || session.id,
         status: "completed",
         access_token: accessToken,
-      },
-      {
-        onConflict: "payment_provider_id",
       }
     );
 
