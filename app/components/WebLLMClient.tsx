@@ -150,9 +150,11 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
 
     try {
       const systemPrompt = "You are a professional assistant. Summarize the following document concisely. Capture the main points, key decisions, and takeaways.";
+      // We limit to 5000 characters (~1200 tokens) to prevent Windows GPU TDR (Timeout Detection and Recovery)
+      // hangs on lower-end devices during the pre-fill phase.
       const messages: webllm.ChatCompletionMessageParam[] = [
         { role: "system", content: systemPrompt },
-        { role: "user", content: `Here is the document to summarize:\n\n${fileContent.substring(0, 15000)}` }
+        { role: "user", content: `Here is the document to summarize:\n\n${fileContent.substring(0, 5000)}` }
       ];
 
       const completion = await engineRef.current.chat.completions.create({
@@ -182,7 +184,17 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
 
     } catch (err: any) {
       console.error("Inference Error:", err);
-      setErrorMsg(err.message || "Failed to generate summary.");
+      let errMsg = err.message || "Failed to generate summary.";
+      
+      // Handle WebGPU Device Lost / Hung errors gracefully
+      if (errMsg.includes("disposed") || errMsg.includes("Device was lost")) {
+        errMsg = "Your graphics card timed out or ran out of memory (WebGPU Device Lost). We've reduced the document size to prevent this. Please refresh the page to reset your GPU and try again.";
+        // Reset global engine so a refresh guarantees a fresh start
+        globalEngine = null;
+        globalInitPromise = null;
+      }
+      
+      setErrorMsg(errMsg);
       setState("error");
     }
   };
