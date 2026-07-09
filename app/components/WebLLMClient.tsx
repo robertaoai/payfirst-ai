@@ -74,8 +74,8 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
         if (!globalInitPromise) {
           globalEngine = new webllm.MLCEngine();
           globalEngine.setInitProgressCallback(initProgressCallback);
-          // Explicitly limit context window to 2048 tokens to prevent GPU OOM on Windows
-          globalInitPromise = globalEngine.reload(MODEL_ID, { context_window_size: 2048 });
+          // Explicitly limit context window to 1024 tokens to prevent GPU OOM on Windows
+          globalInitPromise = globalEngine.reload(MODEL_ID, { context_window_size: 1024 });
         } else if (globalEngine) {
           globalEngine.setInitProgressCallback(initProgressCallback);
         }
@@ -151,11 +151,11 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
 
     try {
       const systemPrompt = "You are a professional assistant. Summarize the following document concisely. Capture the main points, key decisions, and takeaways.";
-      // We limit to 5000 characters (~1200 tokens) to prevent Windows GPU TDR (Timeout Detection and Recovery)
-      // hangs on lower-end devices during the pre-fill phase.
+      // We limit to 1500 characters (~350 tokens) to absolutely ensure the Windows GPU TDR 
+      // (Timeout Detection and Recovery) limit of 2 seconds is never reached on slow GPUs.
       const messages: webllm.ChatCompletionMessageParam[] = [
         { role: "system", content: systemPrompt },
-        { role: "user", content: `Here is the document to summarize:\n\n${fileContent.substring(0, 5000)}` }
+        { role: "user", content: `Here is the document to summarize:\n\n${fileContent.substring(0, 1500)}` }
       ];
 
       const completion = await engineRef.current.chat.completions.create({
