@@ -74,7 +74,8 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
         if (!globalInitPromise) {
           globalEngine = new webllm.MLCEngine();
           globalEngine.setInitProgressCallback(initProgressCallback);
-          globalInitPromise = globalEngine.reload(MODEL_ID);
+          // Explicitly limit context window to 2048 tokens to prevent GPU OOM on Windows
+          globalInitPromise = globalEngine.reload(MODEL_ID, { context_window_size: 2048 });
         } else if (globalEngine) {
           globalEngine.setInitProgressCallback(initProgressCallback);
         }
