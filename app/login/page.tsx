@@ -1,12 +1,39 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const router = useRouter();
+
+  useEffect(() => {
+    // Handle implicit grant hash fragments from generateLink bypass
+    const hash = window.location.hash;
+    if (hash && hash.includes("access_token") && hash.includes("refresh_token")) {
+      const params = new URLSearchParams(hash.substring(1));
+      const access_token = params.get("access_token");
+      const refresh_token = params.get("refresh_token");
+      
+      if (access_token && refresh_token) {
+        setLoading(true);
+        setMessage("Authenticating...");
+        fetch("/api/auth/set-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ access_token, refresh_token })
+        })
+        .then(res => {
+          if (res.ok) router.push("/app");
+          else setMessage("Failed to establish session.");
+        })
+        .catch(() => setMessage("Error establishing session."));
+      }
+    }
+  }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
