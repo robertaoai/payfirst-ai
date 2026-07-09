@@ -21,6 +21,7 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
   const [fileContent, setFileContent] = useState("");
   const [summary, setSummary] = useState("");
   const [copied, setCopied] = useState(false);
+  const [timeElapsed, setTimeElapsed] = useState(0);
   
   const engineRef = useRef<webllm.MLCEngine | null>(null);
   const startTimeRef = useRef<number>(0);
@@ -29,6 +30,19 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
   useEffect(() => {
     initModel();
   }, []);
+
+  // Timer for the pre-filling phase (before first token is generated)
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (state === "summarizing" && summary === "") {
+      interval = setInterval(() => {
+        setTimeElapsed((prev) => prev + 1);
+      }, 1000);
+    } else {
+      setTimeElapsed(0);
+    }
+    return () => clearInterval(interval);
+  }, [state, summary]);
 
   async function initModel() {
     setState("loading_model");
@@ -223,7 +237,7 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
             {state === "summarizing" && (
               <div className="flex items-center gap-2 text-emerald-400 text-sm">
                 <span className="w-4 h-4 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
-                Processing...
+                Processing... {summary === "" && `(${timeElapsed}s)`}
               </div>
             )}
           </div>
@@ -247,7 +261,12 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
             )}
           </div>
           <div className="prose prose-invert max-w-none text-neutral-300 leading-relaxed min-h-[150px]">
-            {summary || <span className="text-neutral-600 animate-pulse">Reading document...</span>}
+            {summary || (
+              <div className="flex flex-col gap-2 text-neutral-600 animate-pulse">
+                <span>Reading document...</span>
+                <span className="text-sm">This usually takes 10-30 seconds on the first run depending on your device. ({timeElapsed}s elapsed)</span>
+              </div>
+            )}
           </div>
         </div>
       )}
