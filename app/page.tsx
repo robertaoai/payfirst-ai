@@ -87,8 +87,12 @@ export default function LandingPage() {
       const data = await res.json();
       if (data.url) {
         window.location.href = data.url;
+      } else if (res.status === 503) {
+        alert("Payment system is being set up. Please try again shortly.");
+        setIntentLogging(false);
       } else {
-        console.error("No checkout URL returned");
+        console.error("No checkout URL returned:", data.error);
+        alert("Something went wrong. Please try again.");
         setIntentLogging(false);
       }
     } catch (err) {

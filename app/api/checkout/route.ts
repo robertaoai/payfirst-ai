@@ -8,6 +8,15 @@ import { NextResponse } from "next/server";
  */
 export async function POST(request: Request) {
   try {
+    // Guard: Stripe must be configured
+    const stripeKey = process.env.STRIPE_SECRET_KEY;
+    if (!stripeKey || stripeKey === "sk_test_placeholder_build_only") {
+      return NextResponse.json(
+        { error: "Stripe is not configured. Add STRIPE_SECRET_KEY to environment variables." },
+        { status: 503 }
+      );
+    }
+
     const body = await request.json();
     const { session_id } = body;
     const origin = request.headers.get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";

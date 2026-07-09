@@ -19,17 +19,22 @@ export default async function ThankYouPage({
   let purchaseFound = false;
 
   if (sessionId) {
-    try {
-      // Retrieve the Stripe checkout session to get buyer details
-      const stripeOptions = CONNECT_ACCOUNT_ID
-        ? { stripeAccount: CONNECT_ACCOUNT_ID }
-        : undefined;
-      const session = await stripe.checkout.sessions.retrieve(sessionId, stripeOptions);
-      buyerEmail = session.customer_details?.email || session.customer_email || "";
+    const stripeKey = process.env.STRIPE_SECRET_KEY;
+    const stripeConfigured = stripeKey && stripeKey !== "sk_test_placeholder_build_only";
 
-      // Check if purchase was recorded in DB
+    try {
+      if (stripeConfigured) {
+        // Retrieve the Stripe checkout session to get buyer details
+        const stripeOptions = CONNECT_ACCOUNT_ID
+          ? { stripeAccount: CONNECT_ACCOUNT_ID }
+          : undefined;
+        const session = await stripe.checkout.sessions.retrieve(sessionId, stripeOptions);
+        buyerEmail = session.customer_details?.email || session.customer_email || "";
+      }
+
+      // Check if purchase was recorded in DB (works even without Stripe key)
+      const supabase = createAdminClient();
       if (buyerEmail) {
-        const supabase = createAdminClient();
         const { data } = await supabase
           .from("purchases")
           .select("id")
@@ -37,6 +42,17 @@ export default async function ThankYouPage({
           .eq("status", "completed")
           .limit(1);
         purchaseFound = (data?.length ?? 0) > 0;
+      } else {
+        // Without Stripe key, check if any recent purchase exists
+        const { data } = await supabase
+          .from("purchases")
+          .select("id, buyer_email")
+          .eq("status", "completed")
+          .order("created_at", { ascending: false })
+          .limit(1);
+        if (data && data.length > 0) {
+          purchaseFound = true;
+        }
       }
     } catch (err) {
       console.error("[thank-you] Error retrieving session:", err);
