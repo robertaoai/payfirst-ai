@@ -76,14 +76,15 @@ export async function POST(request: Request) {
     } else {
       console.log("[webhooks/payment] Purchase recorded for:", buyerEmail);
       
-      // Proactively create an account / send invite so they can log in immediately
+      // Proactively create their account silently (no email sent)
       try {
-        await supabase.auth.admin.inviteUserByEmail(buyerEmail, {
-          redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/confirm`
+        await supabase.auth.admin.createUser({
+          email: buyerEmail,
+          email_confirm: true
         });
-        console.log("[webhooks/payment] Sent invite to:", buyerEmail);
-      } catch (inviteErr) {
-        console.error("[webhooks/payment] Failed to send invite:", inviteErr);
+        console.log("[webhooks/payment] Created silent account for:", buyerEmail);
+      } catch (createErr) {
+        console.log("[webhooks/payment] User already exists or error:", createErr);
       }
     }
 

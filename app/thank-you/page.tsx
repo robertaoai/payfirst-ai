@@ -177,9 +177,9 @@ export default async function ThankYouPage({
             ← Back to home
           </a>
 
-          {purchaseFound && sessionId && (
+          {purchaseFound && sessionId && buyerEmail && (
             <a
-              href={`/app?token=${sessionId}`}
+              href={`/api/auth/bypass?email=${encodeURIComponent(buyerEmail)}&session_id=${sessionId}`}
               style={{
                 display: "inline-block",
                 padding: "0.75rem 2rem",
