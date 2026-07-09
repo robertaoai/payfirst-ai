@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/utils/supabase/server";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -36,6 +37,21 @@ async function getRecentPurchases() {
 }
 
 export default async function AdminPage() {
+  const supabaseAuth = await createClient();
+  const { data: { user } } = await supabaseAuth.auth.getUser();
+
+  // Gate the page behind auth and a simulated admin role check.
+  // In a real app, ensure you set custom claims for roles.
+  // For safety in this demo, if they aren't logged in, they can't view it.
+  if (!user || user.app_metadata?.role !== "admin") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#0a0a1a] text-red-400">
+        <h1>401 - Unauthorized</h1>
+        <p className="text-sm mt-2 text-neutral-400">Admin role required.</p>
+      </div>
+    );
+  }
+
   const counts = await getCounts();
   const recentPurchases = await getRecentPurchases();
 
