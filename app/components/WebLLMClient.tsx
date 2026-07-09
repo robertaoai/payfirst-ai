@@ -9,7 +9,9 @@ import ReactMarkdown from "react-markdown";
 // We'll use the CDN link that matches the installed version.
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
-const MODEL_ID = "Qwen2-0.5B-Instruct-q4f16_1-MLC";
+const MODEL_ID = process.env.NEXT_PUBLIC_WEBLLM_MODEL_ID || "Qwen2-0.5B-Instruct-q4f16_1-MLC";
+const CONTEXT_WINDOW_SIZE = parseInt(process.env.NEXT_PUBLIC_WEBLLM_CONTEXT_WINDOW || "1024", 10);
+const MAX_PROMPT_CHARS = parseInt(process.env.NEXT_PUBLIC_WEBLLM_MAX_PROMPT_CHARS || "1500", 10);
 
 type AppState = "init" | "loading_model" | "empty_drop" | "file_loaded" | "summarizing" | "summary_ready" | "error";
 
@@ -74,8 +76,8 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
         if (!globalInitPromise) {
           globalEngine = new webllm.MLCEngine();
           globalEngine.setInitProgressCallback(initProgressCallback);
-          // Explicitly limit context window to 1024 tokens to prevent GPU OOM on Windows
-          globalInitPromise = globalEngine.reload(MODEL_ID, { context_window_size: 1024 });
+          // Limit context window based on env variable to prevent GPU OOM on Windows
+          globalInitPromise = globalEngine.reload(MODEL_ID, { context_window_size: CONTEXT_WINDOW_SIZE });
         } else if (globalEngine) {
           globalEngine.setInitProgressCallback(initProgressCallback);
         }
@@ -151,11 +153,11 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
 
     try {
       const systemPrompt = "You are a professional assistant. Summarize the following document concisely. Capture the main points, key decisions, and takeaways.";
-      // We limit to 1500 characters (~350 tokens) to absolutely ensure the Windows GPU TDR 
+      // We limit to MAX_PROMPT_CHARS to absolutely ensure the Windows GPU TDR 
       // (Timeout Detection and Recovery) limit of 2 seconds is never reached on slow GPUs.
       const messages: webllm.ChatCompletionMessageParam[] = [
         { role: "system", content: systemPrompt },
-        { role: "user", content: `Here is the document to summarize:\n\n${fileContent.substring(0, 1500)}` }
+        { role: "user", content: `Here is the document to summarize:\n\n${fileContent.substring(0, MAX_PROMPT_CHARS)}` }
       ];
 
       const completion = await engineRef.current.chat.completions.create({
@@ -212,7 +214,7 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
         <div className="w-16 h-16 rounded-full border-4 border-neutral-800 border-t-emerald-500 animate-spin" />
         <div className="text-center space-y-2">
           <h2 className="text-xl font-medium text-white">Loading Local AI Engine</h2>
-          <p className="text-sm text-neutral-400">Downloading Qwen2-0.5B (only happens once)</p>
+          <p className="text-sm text-neutral-400">Downloading Model (only happens once)</p>
         </div>
         <div className="w-full max-w-md bg-neutral-900 rounded-full h-3 overflow-hidden border border-white/5">
           <div 
