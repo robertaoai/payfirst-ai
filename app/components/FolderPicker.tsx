@@ -31,7 +31,7 @@ export function FolderPicker({ onFileLoaded, onError }: FolderPickerProps) {
         if (entry.kind === "file") {
           const lowerName = entry.name.toLowerCase();
           if (lowerName.endsWith(".txt") || lowerName.endsWith(".pdf")) {
-            validFiles.push(entry);
+            validFiles.push({ handle: entry, name: entry.name });
           }
         }
       }
