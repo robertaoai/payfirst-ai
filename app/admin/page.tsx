@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/utils/supabase/server";
+import { FeatureToggle } from "./FeatureToggle";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -36,6 +37,15 @@ async function getRecentPurchases() {
   return data ?? [];
 }
 
+async function getFeatureFlags() {
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from("feature_flags")
+    .select("feature_name, is_enabled")
+    .order("feature_name");
+  return data ?? [];
+}
+
 export default async function AdminPage() {
   const supabaseAuth = await createClient();
   const { data: { user } } = await supabaseAuth.auth.getUser();
@@ -54,6 +64,9 @@ export default async function AdminPage() {
 
   const counts = await getCounts();
   const recentPurchases = await getRecentPurchases();
+  const featureFlags = await getFeatureFlags();
+
+  const folderPickerFlag = featureFlags.find(f => f.feature_name === "folder_link_file_selector")?.is_enabled ?? false;
 
   return (
     <main
@@ -83,6 +96,27 @@ export default async function AdminPage() {
           <p style={{ color: "#8888aa", marginTop: "0.5rem", fontSize: "0.875rem" }}>
             Live metrics from Supabase · Auto-refreshes on page load
           </p>
+        </div>
+
+        {/* Feature Toggles */}
+        <div
+          style={{
+            background: "rgba(255,255,255,0.04)",
+            borderRadius: "12px",
+            border: "1px solid rgba(255,255,255,0.08)",
+            padding: "1.5rem",
+            marginBottom: "2.5rem",
+          }}
+        >
+          <h2 style={{ fontSize: "1.125rem", fontWeight: 600, margin: "0 0 1rem 0", color: "#c4b5fd" }}>
+            Feature Toggles / BCP
+          </h2>
+          <div className="space-y-3">
+            <FeatureToggle 
+              featureName="folder_link_file_selector" 
+              initialState={folderPickerFlag} 
+            />
+          </div>
         </div>
 
         {/* Stat cards */}

@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from "react";
 import * as webllm from "@mlc-ai/web-llm";
 import * as pdfjsLib from "pdfjs-dist";
 import ReactMarkdown from "react-markdown";
+import { createClient } from "@/lib/supabase/client";
+import { FolderPicker } from "./FolderPicker";
 
 // Need to specify the worker src for PDF.js to work client-side.
 // We'll use the CDN link that matches the installed version.
@@ -30,6 +32,7 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
   const [copied, setCopied] = useState(false);
   const [timeElapsed, setTimeElapsed] = useState(0);
   const [totalDuration, setTotalDuration] = useState<number | null>(null);
+  const [isFolderPickerEnabled, setIsFolderPickerEnabled] = useState(false);
   
   const engineRef = useRef<webllm.MLCEngine | null>(null);
   const startTimeRef = useRef<number>(0);
@@ -50,6 +53,24 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
   // Initialize on mount
   useEffect(() => {
     let isMounted = true;
+
+    async function fetchFlags() {
+      try {
+        const supabase = createClient();
+        const { data } = await supabase
+          .from("feature_flags")
+          .select("is_enabled")
+          .eq("feature_name", "folder_link_file_selector")
+          .single();
+          
+        if (isMounted && data?.is_enabled) {
+          setIsFolderPickerEnabled(true);
+        }
+      } catch (err) {
+        // Silent fail for flag fetching
+      }
+    }
+    fetchFlags();
 
     async function doInit() {
       // If already initialized globally, just use it
@@ -141,6 +162,12 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
       setErrorMsg("Unsupported file type. Please upload a PDF or TXT file.");
       setState("error");
     }
+  };
+
+  const handleFolderFileLoaded = (name: string, content: string) => {
+    setFileName(name);
+    setFileContent(content);
+    setState("file_loaded");
   };
 
   const handleSummarize = async () => {
@@ -255,7 +282,7 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
         ${state === "empty_drop" ? "border-neutral-700 hover:border-emerald-500/50" : "border-emerald-500/30 bg-emerald-500/5"}`}>
         
         {state === "empty_drop" && (
-          <div className="space-y-4">
+          <div className="space-y-4 w-full">
             <div className="text-4xl">📄</div>
             <div>
               <h3 className="text-lg font-medium text-white">Drop a document to summarize</h3>
@@ -266,6 +293,25 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
               <input type="file" accept=".pdf,.txt" className="hidden" onChange={handleFileUpload} />
             </label>
           </div>
+        )}
+
+        {state === "empty_drop" && isFolderPickerEnabled && (
+          <>
+            <div className="w-full flex items-center gap-4 my-6 opacity-30">
+              <div className="flex-1 h-[1px] bg-white"></div>
+              <span className="text-xs font-medium uppercase tracking-widest text-white">OR</span>
+              <div className="flex-1 h-[1px] bg-white"></div>
+            </div>
+            <div className="w-full">
+              <FolderPicker 
+                onFileLoaded={handleFolderFileLoaded} 
+                onError={(msg) => {
+                  setErrorMsg(msg);
+                  setState("error");
+                }} 
+              />
+            </div>
+          </>
         )}
 
         {(state === "file_loaded" || state === "summarizing" || state === "summary_ready") && (
