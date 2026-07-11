@@ -163,7 +163,7 @@ export function FolderPicker({ onFileLoaded, onError, onFolderScanned, disabled 
 
   if (files.length > 0) {
     return (
-      <div className="border-2 border-emerald-500/30 bg-emerald-500/5 rounded-2xl p-6 text-left">
+      <div className={`border-2 border-emerald-500/30 bg-emerald-500/5 rounded-2xl p-6 text-left transition-colors ${disabled ? "opacity-50 pointer-events-none" : ""}`}>
         <h3 className="text-lg font-medium text-white mb-2">Select exactly one file to summarize</h3>
         <p className="text-sm text-neutral-400 mb-4">Found {files.length} document(s) in the linked folder.</p>
         
@@ -172,8 +172,8 @@ export function FolderPicker({ onFileLoaded, onError, onFolderScanned, disabled 
             <button
               key={i}
               onClick={() => handleSelectFile(f.handle)}
-              disabled={isLoading}
-              className="w-full text-left flex items-center justify-between p-3 rounded-xl bg-neutral-900 border border-white/10 hover:border-emerald-500/50 hover:bg-neutral-800 transition-colors group disabled:opacity-50 disabled:cursor-wait"
+              disabled={isLoading || disabled}
+              className="w-full text-left flex items-center justify-between p-3 rounded-xl bg-neutral-900 border border-white/10 hover:border-emerald-500/50 hover:bg-neutral-800 transition-colors group disabled:opacity-50 disabled:cursor-wait disabled:hover:border-white/10"
             >
               <div className="flex items-center gap-3 truncate">
                 <span className="text-xl">{f.name.endsWith(".pdf") ? "📕" : "📄"}</span>

@@ -524,10 +524,10 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
       </div>
 
       {/* briefcase-ai Pipeline */}
-      {aiBriefcaseEnabled && (
-        <div className={`space-y-6 w-full ${activeTab !== "briefcase-ai" ? "hidden" : "block"}`}>
-          <div className="bg-[#12121a] border border-white/10 rounded-2xl p-8 shadow-xl">
-            <div className="flex items-center gap-3 mb-6">
+        {aiBriefcaseEnabled && (
+          <div className={`space-y-6 w-full ${activeTab !== "briefcase-ai" ? "hidden" : "block"}`}>
+            <div className="bg-[#12121a] border border-white/10 rounded-2xl p-8 shadow-xl">
+              <div className="flex items-center gap-3 mb-6">
               <span className="text-3xl">💼</span>
               <h2 className="text-2xl font-bold text-white">Briefcase AI</h2>
             </div>
@@ -566,6 +566,16 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
               </div>
             ) : (
               <div className="space-y-6">
+                {errorMsg && (
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-start gap-3 mb-2 transition-all">
+                    <span className="text-red-400 mt-0.5">⚠️</span>
+                    <div className="flex-1">
+                      <p className="text-sm text-red-300">{errorMsg}</p>
+                    </div>
+                    <button onClick={() => setErrorMsg("")} className="text-neutral-500 hover:text-white transition-colors">✕</button>
+                  </div>
+                )}
+
                 <div className="bg-indigo-500/10 border border-indigo-500/20 p-4 rounded-xl flex items-center justify-between">
                   <div>
                     <h3 className="font-medium text-indigo-300">Folder Linked</h3>
@@ -641,144 +651,249 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
                 </div>
 
                 {/* Concurrency UI Actions */}
-                <div className="pt-4 border-t border-white/10 flex items-center justify-between">
-                  <button 
-                    onClick={async () => {
-                      if (!globalEngine) return;
-                      setBriefcaseState("running");
-                      briefcaseAbortRef.current = new AbortController();
-                      const signal = briefcaseAbortRef.current.signal;
-                      
-                      try {
-                        const stallPromise = (async () => {
-                           if (!hasCompletedFirstStall) {
-                              hasCompletedFirstStall = true;
-                              await new Promise(r => setTimeout(r, 15000));
-                           }
-                        })();
-
-                        const generatePromise = (async () => {
-                           await stallPromise;
-                           let text = "Mocked generated output text for task: " + briefcaseTask;
-                           for (let i = 0; i < 5; i++) {
-                             await new Promise(r => setTimeout(r, 1000));
-                           }
-                           return text;
-                        })();
-
-                        const abortPromise = new Promise<never>((_, reject) => {
-                           signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
-                        });
-
-                        const generatedText = await Promise.race([generatePromise, abortPromise]);
-                        
-                        const dirHandle = scanResult.dirHandle;
-                        let outputDirHandle: any = null;
-                        let fallbackDownload = false;
-
-                        // 1. Get or create output/ directory
-                        try {
-                           outputDirHandle = await dirHandle.getDirectoryHandle("output", { create: true });
-                        } catch (err: any) {
-                           if (err.name === "TypeMismatchError") {
-                              fallbackDownload = true;
-                              setErrorMsg("File saved to your downloads. Folder write failed, so the next step isn't available for this run.");
-                           } else {
-                              setErrorMsg("Failed to create output directory: " + err.message);
-                              return; // Stop on unexpected error
-                           }
+                <div className="pt-4 border-t border-white/10 flex flex-wrap items-center gap-4">
+                  {folderAgentEnabled && (
+                    <button 
+                      onClick={async () => {
+                        if (briefcaseHandlePermission !== "readwrite") {
+                          throw new Error("Permission denied. Please click 'Get write access' first.");
                         }
+                        if (!globalEngine) return;
+                        setBriefcaseState("running");
+                        briefcaseAbortRef.current = new AbortController();
+                        const signal = briefcaseAbortRef.current.signal;
+                        
+                        try {
+                          const stallPromise = (async () => {
+                             if (!hasCompletedFirstStall) {
+                                hasCompletedFirstStall = true;
+                                await new Promise(r => setTimeout(r, 15000));
+                             }
+                          })();
 
-                        // 2. Write Output
-                        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-                        const outFilename = `result-${timestamp}.md`;
+                          const generatePromise = (async () => {
+                             await stallPromise;
+                             let text = "Mocked generated output text for task: " + briefcaseTask;
+                             for (let i = 0; i < 5; i++) {
+                               await new Promise(r => setTimeout(r, 1000));
+                             }
+                             return text;
+                          })();
 
-                        if (fallbackDownload) {
-                           const blob = new Blob([generatedText], { type: 'text/markdown' });
-                           const url = URL.createObjectURL(blob);
-                           const a = document.createElement("a");
-                           a.href = url;
-                           a.download = outFilename;
-                           a.click();
-                           URL.revokeObjectURL(url);
-                           // status.json write stays incomplete, Briefcase stays disabled
-                        } else {
-                           // Pre-write existence check (required for templates, shown here for output too)
+                          const abortPromise = new Promise<never>((_, reject) => {
+                             signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+                          });
+
+                          const generatedText = await Promise.race([generatePromise, abortPromise]);
+                          
+                          const dirHandle = scanResult.dirHandle;
+                          let outputDirHandle: any = null;
+                          let fallbackDownload = false;
+
+                          // 1. Get or create output/ directory
+                          try {
+                             outputDirHandle = await dirHandle.getDirectoryHandle("output", { create: true });
+                          } catch (err: any) {
+                             if (err.name === "TypeMismatchError") {
+                                fallbackDownload = true;
+                                setErrorMsg("File saved to your downloads. Folder write failed, so the next step isn't available for this run.");
+                             } else if (err.name === "QuotaExceededError") {
+                                setErrorMsg("Storage quota exceeded. Cannot create output folder.");
+                                return;
+                             } else if (err.name === "NotAllowedError") {
+                                setErrorMsg("Permission to write was revoked. Cannot create output folder.");
+                                return;
+                             } else {
+                                setErrorMsg("Failed to create output directory: " + err.message);
+                                return; // Stop on unexpected error
+                             }
+                          }
+
+                          // 2. Write Output
+                          const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+                          const outFilename = `result-${timestamp}.md`;
+
+                          if (fallbackDownload) {
+                             const blob = new Blob([generatedText], { type: 'text/markdown' });
+                             const url = URL.createObjectURL(blob);
+                             const a = document.createElement("a");
+                             a.href = url;
+                             a.download = outFilename;
+                             a.click();
+                             URL.revokeObjectURL(url);
+                             // status.json write stays incomplete, Briefcase stays disabled
+                          } else {
+                             // Pre-write existence check (required for templates, shown here for output too)
+                             let exists = false;
+                             try {
+                               await outputDirHandle.getFileHandle(outFilename);
+                               exists = true;
+                             } catch (e: any) {
+                               if (e.name !== "NotFoundError") throw e;
+                             }
+
+                             if (exists) {
+                               setErrorMsg(`File ${outFilename} already exists. Write skipped.`);
+                             } else {
+                               // Atomic write
+                               const fileHandle = await outputDirHandle.getFileHandle(outFilename, { create: true });
+                               const writable = await fileHandle.createWritable();
+                               try {
+                                 if (signal.aborted) {
+                                   await writable.abort();
+                                   throw new DOMException("Aborted", "AbortError");
+                                 }
+
+                                 await writable.write(generatedText);
+                                 await writable.close();
+                               } catch (writeErr) {
+                                 await writable.abort();
+                                 throw writeErr;
+                               }
+                             }
+
+                             // 3. Write status.json
+                             try {
+                                const statusHandle = await dirHandle.getFileHandle("status.json", { create: true });
+                                const writable = await statusHandle.createWritable();
+                                try {
+                                   if (signal.aborted) {
+                                     await writable.abort();
+                                     throw new DOMException("Aborted", "AbortError");
+                                   }
+                                   const newStatus = {
+                                     step: "Setup Complete",
+                                     last_completed: timestamp,
+                                     convention_files: scanResult.conventionFiles
+                                   };
+                                   await writable.write(JSON.stringify(newStatus, null, 2));
+                                   await writable.close();
+                                   // Update state to trigger re-render
+                                   setScanResult({ ...scanResult, statusJson: newStatus });
+                                } catch (writeErr) {
+                                   await writable.abort();
+                                   throw writeErr;
+                                }
+                             } catch (err: any) {
+                                if (err.name !== "AbortError") {
+                                   setErrorMsg("Failed to write status.json. Output was saved, but pipeline status is incomplete.");
+                                } else {
+                                   throw err;
+                                }
+                             }
+                          }
+                        } catch (err: any) {
+                          if (err.name === "AbortError") {
+                             console.log("Setup Cancelled");
+                          } else {
+                             setErrorMsg(err.message || "An unexpected error occurred during setup.");
+                          }
+                        } finally {
+                          if (briefcaseAbortRef.current?.signal.aborted) {
+                             // Force reload engine to clear aborted state
+                             try { await globalEngine.reload(MODEL_ID, { context_window_size: CONTEXT_WINDOW_SIZE }); } catch(e) {}
+                          }
+                          setBriefcaseState("idle");
+                          briefcaseAbortRef.current = null;
+                        }
+                      }}
+                      disabled={state === "processing" || state === "summarizing" || briefcaseState !== "idle" || briefcaseTask.trim() === ""}
+                      className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-3 rounded-xl font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      🚀 Setup Briefcase
+                    </button>
+                  )}
+
+                  {aiBriefcaseEnabled && (
+                    <button 
+                      onClick={async () => {
+                        if (briefcaseHandlePermission !== "readwrite") {
+                          throw new Error("Permission denied. Please click 'Get write access' first.");
+                        }
+                        if (!globalEngine) return;
+                        setBriefcaseState("running");
+                        briefcaseAbortRef.current = new AbortController();
+                        const signal = briefcaseAbortRef.current.signal;
+                        try {
+                           // Step 8 Write Safety will go here
+                           // Currently mocking inference stall
+                           const stallPromise = (async () => {
+                              if (!hasCompletedFirstStall) {
+                                 hasCompletedFirstStall = true;
+                                 await new Promise(r => setTimeout(r, 15000));
+                              }
+                           })();
+                           const generatePromise = (async () => {
+                              await stallPromise;
+                              const text = "Mocked convention template CLAUDE.md content for task: " + briefcaseTask;
+                              for (let i = 0; i < 5; i++) {
+                                await new Promise(r => setTimeout(r, 1000));
+                              }
+                              return text;
+                           })();
+                           const abortPromise = new Promise<never>((_, reject) => {
+                              signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+                           });
+                           const generatedText = await Promise.race([generatePromise, abortPromise]);
+                           
+                           // Check for existing CLAUDE.md
+                           const dirHandle = scanResult.dirHandle;
                            let exists = false;
                            try {
-                             await outputDirHandle.getFileHandle(outFilename);
+                             await dirHandle.getFileHandle("CLAUDE.md");
                              exists = true;
                            } catch (e: any) {
-                             if (e.name !== "NotFoundError") throw e;
+                             if (e.name !== "NotFoundError") {
+                               if (e.name === "NotAllowedError") {
+                                 throw new Error("Permission revoked. Cannot read folder to check for CLAUDE.md.");
+                               }
+                               throw e;
+                             }
                            }
 
                            if (exists) {
-                             setErrorMsg(`File ${outFilename} already exists. Write skipped.`);
+                             setErrorMsg("Skipped CLAUDE.md: already exists.");
                            } else {
-                             // Atomic write
-                             const fileHandle = await outputDirHandle.getFileHandle(outFilename, { create: true });
+                             const fileHandle = await dirHandle.getFileHandle("CLAUDE.md", { create: true });
                              const writable = await fileHandle.createWritable();
                              try {
                                if (signal.aborted) {
                                  await writable.abort();
                                  throw new DOMException("Aborted", "AbortError");
                                }
+
                                await writable.write(generatedText);
                                await writable.close();
+                               console.log("Briefcase Templates Generated");
                              } catch (writeErr) {
                                await writable.abort();
                                throw writeErr;
                              }
                            }
-
-                           // 3. Write status.json
-                           try {
-                              const statusHandle = await dirHandle.getFileHandle("status.json", { create: true });
-                              const writable = await statusHandle.createWritable();
-                              try {
-                                 if (signal.aborted) {
-                                   await writable.abort();
-                                   throw new DOMException("Aborted", "AbortError");
-                                 }
-                                 const newStatus = {
-                                   step: "Setup Complete",
-                                   last_completed: timestamp,
-                                   convention_files: scanResult.conventionFiles
-                                 };
-                                 await writable.write(JSON.stringify(newStatus, null, 2));
-                                 await writable.close();
-                                 // Update state to trigger re-render
-                                 setScanResult({ ...scanResult, statusJson: newStatus });
-                              } catch (writeErr) {
-                                 await writable.abort();
-                                 throw writeErr;
-                              }
-                           } catch (err: any) {
-                              if (err.name !== "AbortError") {
-                                 setErrorMsg("Failed to write status.json. Output was saved, but pipeline status is incomplete.");
-                              } else {
-                                 throw err;
-                              }
-                           }
+                        } catch (err: any) {
+                          if (err.name === "AbortError") {
+                            console.log("Briefcase Cancelled");
+                          } else if (err.name === "QuotaExceededError") {
+                            setErrorMsg("Storage quota exceeded. Cannot write CLAUDE.md.");
+                          } else if (err.name === "NotAllowedError") {
+                            setErrorMsg("Permission revoked. Cannot write CLAUDE.md.");
+                          } else {
+                            setErrorMsg(err.message || "Failed to generate templates.");
+                          }
+                        } finally {
+                          if (briefcaseAbortRef.current?.signal.aborted) {
+                             try { await globalEngine.reload(MODEL_ID, { context_window_size: CONTEXT_WINDOW_SIZE }); } catch(e) {}
+                          }
+                          setBriefcaseState("idle");
+                          briefcaseAbortRef.current = null;
                         }
-                      } catch (err: any) {
-                        if (err.name === "AbortError") {
-                           console.log("Setup Cancelled");
-                        }
-                      } finally {
-                        if (briefcaseAbortRef.current?.signal.aborted) {
-                           // Force reload engine to clear aborted state
-                           try { await globalEngine.reload(MODEL_ID, { context_window_size: CONTEXT_WINDOW_SIZE }); } catch(e) {}
-                        }
-                        setBriefcaseState("idle");
-                        briefcaseAbortRef.current = null;
-                      }
-                    }}
-                    disabled={state === "processing" || state === "summarizing" || briefcaseState !== "idle" || briefcaseTask.trim() === ""}
-                    className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-3 rounded-xl font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
-                    🚀 Setup Briefcase
-                  </button>
+                      }}
+                      disabled={state === "processing" || state === "summarizing" || briefcaseState !== "idle" || briefcaseTask.trim() === "" || (folderAgentEnabled && !scanResult.statusJson)}
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-3 rounded-xl font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      💼 Generate Templates
+                    </button>
+                  )}
                 </div>
 
               </div>
@@ -786,7 +901,6 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
           </div>
         </div>
       )}
-      
       </div>
     </div>
   );
