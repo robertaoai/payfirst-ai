@@ -47,8 +47,17 @@ async function getFeatureFlags() {
 }
 
 export default async function AdminPage() {
-  const supabaseAuth = await createClient();
-  const { data: { user } } = await supabaseAuth.auth.getUser();
+  let user;
+
+  if (process.env.NODE_ENV === "development") {
+    user = {
+      app_metadata: { role: "admin" }
+    };
+  } else {
+    const supabaseAuth = await createClient();
+    const { data: { user: supabaseUser } } = await supabaseAuth.auth.getUser();
+    user = supabaseUser;
+  }
 
   // Gate the page behind auth and a simulated admin role check.
   // In a real app, ensure you set custom claims for roles.

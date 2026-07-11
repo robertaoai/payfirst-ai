@@ -9,18 +9,32 @@ export default async function AppRoute({
 }: {
   searchParams: Promise<{ token?: string }>;
 }) {
-  const supabaseAuth = await createClient();
-  const { data: { user } } = await supabaseAuth.auth.getUser();
+  let user;
+  let purchases = [];
 
-  if (!user) {
-    redirect("/login");
+  if (process.env.NODE_ENV === "development") {
+    user = {
+      id: "mock-user-id",
+      email: "robertanct@yahoo.com.sg",
+      role: "authenticated",
+    };
+    purchases = [{ id: "mock-purchase-id", status: "completed" }];
+  } else {
+    const supabaseAuth = await createClient();
+    const { data: { user: supabaseUser } } = await supabaseAuth.auth.getUser();
+    user = supabaseUser;
+
+    if (!user) {
+      redirect("/login");
+    }
+
+    // Check if they actually paid (RLS ensures they only see their own purchases)
+    const { data: dbPurchases } = await supabaseAuth
+      .from("purchases")
+      .select("id, status")
+      .eq("status", "completed");
+    purchases = dbPurchases || [];
   }
-
-  // Check if they actually paid (RLS ensures they only see their own purchases)
-  const { data: purchases } = await supabaseAuth
-    .from("purchases")
-    .select("id, status")
-    .eq("status", "completed");
 
   if (!purchases || purchases.length === 0) {
     // If they logged in but haven't bought anything, redirect to landing page

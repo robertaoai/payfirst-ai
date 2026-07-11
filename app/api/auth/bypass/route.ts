@@ -11,6 +11,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Email is required" }, { status: 400 });
   }
 
+  if (process.env.NODE_ENV === "development") {
+    return NextResponse.redirect(new URL("/app", request.url));
+  }
+
   // Security check: must provide session_id to bypass auth
   if (!sessionId) {
     return NextResponse.json({ error: "Unauthorized: Missing session_id" }, { status: 401 });

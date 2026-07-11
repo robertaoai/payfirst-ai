@@ -6,13 +6,36 @@ import * as pdfjsLib from "pdfjs-dist";
 // Ensure worker is configured for PDF parsing
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
+export type ConventionFiles = {
+  base: {
+    "CLAUDE.md": boolean;
+    "AGENT.md": boolean;
+    "TASK.md": boolean;
+  };
+  subfolders: {
+    "agent.md": boolean;
+    "task.md": boolean;
+  };
+};
+
+export type FolderScanResult = {
+  dirHandle: any;
+  statusJson: any | null;
+  statusJsonError?: string;
+  conventionFiles: ConventionFiles;
+};
+
 interface FolderPickerProps {
   onFileLoaded: (fileName: string, content: string) => void;
   onError: (error: string) => void;
+  onFolderScanned?: (result: FolderScanResult) => void;
+  disabled?: boolean;
 }
 
-export function FolderPicker({ onFileLoaded, onError }: FolderPickerProps) {
+export function FolderPicker({ onFileLoaded, onError, onFolderScanned, disabled }: FolderPickerProps) {
   const [files, setFiles] = useState<{ handle: any; name: string }[]>([]);
+  const [dirHandle, setDirHandle] = useState<any>(null);
+  const [permissionError, setPermissionError] = useState<{ type: 'initial' | 'revoked', message: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleLinkFolder = async () => {
@@ -23,25 +46,86 @@ export function FolderPicker({ onFileLoaded, onError }: FolderPickerProps) {
       }
 
       setIsLoading(true);
-      const dirHandle = await (window as any).showDirectoryPicker();
-      const validFiles: { handle: any; name: string }[] = [];
+      setPermissionError(null);
 
-      // Iterate through the directory manually (no subfolders per constraints)
-      for await (const entry of dirHandle.values()) {
+      let handle = dirHandle;
+      
+      // If we don't have a handle, or we had an initial denial (meaning no handle was ever granted), ask for one
+      if (!handle || permissionError?.type === 'initial') {
+        handle = await (window as any).showDirectoryPicker({ mode: "read" });
+        setDirHandle(handle);
+      }
+
+      // Check permissions for the handle (handles mid-session revocation)
+      if ((await handle.queryPermission({ mode: "read" })) !== "granted") {
+        const status = await handle.requestPermission({ mode: "read" });
+        if (status !== "granted") {
+          setPermissionError({ type: 'revoked', message: "Permission to read the folder was revoked. Please grant access to continue." });
+          return;
+        }
+      }
+
+      const validFiles: { handle: any; name: string }[] = [];
+      const conventionFiles: ConventionFiles = {
+        base: { "CLAUDE.md": false, "AGENT.md": false, "TASK.md": false },
+        subfolders: { "agent.md": false, "task.md": false }
+      };
+      let statusJson: any = null;
+      let statusJsonError: string | undefined;
+
+      // Iterate through the directory manually
+      for await (const entry of handle.values()) {
+        if (entry.name === "output") {
+          continue; // Exclude output directory
+        }
+
         if (entry.kind === "file") {
-          const lowerName = entry.name.toLowerCase();
+          const name = entry.name;
+          const lowerName = name.toLowerCase();
+          
           if (lowerName.endsWith(".txt") || lowerName.endsWith(".pdf")) {
             validFiles.push({ handle: entry, name: entry.name });
+          }
+
+          if (name === "status.json") {
+            try {
+              const file = await entry.getFile();
+              const text = await file.text();
+              statusJson = JSON.parse(text);
+            } catch (e) {
+              statusJsonError = "existing status.json couldn't be read, starting fresh";
+            }
+          }
+
+          if (name === "CLAUDE.md" || name === "AGENT.md" || name === "TASK.md") {
+            conventionFiles.base[name] = true;
+          }
+        } else if (entry.kind === "directory") {
+          // Scan 1-level deep subfolders for agent.md and task.md
+          for await (const subEntry of entry.values()) {
+            if (subEntry.kind === "file") {
+              const subName = subEntry.name;
+              if (subName === "agent.md" || subName === "task.md") {
+                conventionFiles.subfolders[subName] = true;
+              }
+            }
           }
         }
       }
 
       setFiles(validFiles);
+      if (onFolderScanned) {
+        onFolderScanned({ dirHandle: handle, statusJson, statusJsonError, conventionFiles });
+      }
+
       if (validFiles.length === 0) {
         onError("No .txt or .pdf files found in this folder.");
       }
     } catch (err: any) {
-      if (err.name !== "AbortError") {
+      if (err.name === "AbortError") {
+        setPermissionError({ type: 'initial', message: "Folder selection was canceled. You must link a folder to use this feature." });
+        setDirHandle(null);
+      } else {
         console.error("Folder picker error:", err);
         onError("Failed to access folder.");
       }
@@ -101,19 +185,33 @@ export function FolderPicker({ onFileLoaded, onError }: FolderPickerProps) {
             </button>
           ))}
         </div>
-        
-        <button
-          onClick={() => setFiles([])}
-          className="mt-4 text-xs text-neutral-500 hover:text-white transition-colors"
-        >
-          Cancel & choose a different folder
-        </button>
+      </div>
+    );
+  }
+
+  if (permissionError) {
+    return (
+      <div className={`border-2 border-dashed border-red-500/50 hover:border-red-500 rounded-2xl p-10 text-center transition-colors ${disabled ? "opacity-50 pointer-events-none" : "bg-red-500/5"}`}>
+        <div className="space-y-4">
+          <div className="text-4xl">⚠️</div>
+          <div>
+            <h3 className="text-lg font-medium text-white">Permission Required</h3>
+            <p className="text-sm text-red-400 mt-1 max-w-sm mx-auto">{permissionError.message}</p>
+          </div>
+          <button
+            onClick={handleLinkFolder}
+            disabled={isLoading || disabled}
+            className="inline-block mt-2 bg-red-500/20 text-red-300 border border-red-500/30 px-6 py-2 rounded-full text-sm font-medium hover:bg-red-500/30 transition-colors disabled:opacity-50"
+          >
+            {isLoading ? "Loading..." : (permissionError.type === 'initial' ? "Choose Folder Again" : "Grant Permission")}
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="border-2 border-dashed border-neutral-700 hover:border-indigo-500/50 rounded-2xl p-10 text-center transition-colors">
+    <div className={`border-2 border-dashed border-neutral-700 hover:border-indigo-500/50 rounded-2xl p-10 text-center transition-colors ${disabled ? "opacity-50 pointer-events-none" : ""}`}>
       <div className="space-y-4">
         <div className="text-4xl">📁</div>
         <div>
@@ -122,7 +220,7 @@ export function FolderPicker({ onFileLoaded, onError }: FolderPickerProps) {
         </div>
         <button
           onClick={handleLinkFolder}
-          disabled={isLoading}
+          disabled={isLoading || disabled}
           className="inline-block mt-2 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-6 py-2 rounded-full text-sm font-medium hover:bg-indigo-500/20 transition-colors disabled:opacity-50"
         >
           {isLoading ? "Loading..." : "Select Folder"}
