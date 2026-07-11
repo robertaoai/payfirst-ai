@@ -76,6 +76,8 @@ export default async function AdminPage() {
   const featureFlags = await getFeatureFlags();
 
   const folderPickerFlag = featureFlags.find(f => f.feature_name === "folder_link_file_selector")?.is_enabled ?? false;
+  const briefcaseFlag = featureFlags.find(f => f.feature_name === "ai_briefcase_pipeline")?.is_enabled ?? false;
+  const folderAgentFlag = featureFlags.find(f => f.feature_name === "folder_agent_pipeline")?.is_enabled ?? false;
 
   return (
     <main
@@ -120,11 +122,22 @@ export default async function AdminPage() {
           <h2 style={{ fontSize: "1.125rem", fontWeight: 600, margin: "0 0 1rem 0", color: "#c4b5fd" }}>
             Feature Toggles / BCP
           </h2>
-          <div className="space-y-3">
+          <div className="space-y-4">
             <FeatureToggle 
               featureName="folder_link_file_selector" 
               initialState={folderPickerFlag} 
             />
+            
+            <div className="pl-6 ml-3 space-y-3 border-l-2 border-white/10 mt-2">
+              <FeatureToggle 
+                featureName="ai_briefcase_pipeline" 
+                initialState={briefcaseFlag} 
+              />
+              <FeatureToggle 
+                featureName="folder_agent_pipeline" 
+                initialState={folderAgentFlag} 
+              />
+            </div>
           </div>
         </div>
 

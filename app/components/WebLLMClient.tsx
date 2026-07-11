@@ -350,7 +350,7 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
   return (
     <div className="flex flex-col md:flex-row gap-8">
       {/* Navigation Sidebar */}
-      {(aiBriefcaseEnabled || folderAgentEnabled) && (
+      {((aiBriefcaseEnabled && isFolderPickerEnabled) || folderAgentEnabled) && (
         <div className="w-full md:w-64 shrink-0 flex flex-col gap-2">
           <h2 className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2 px-3">Pipelines</h2>
           <button 
@@ -360,7 +360,7 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
           >
             payfirst-ai
           </button>
-          {aiBriefcaseEnabled && (
+          {(aiBriefcaseEnabled && isFolderPickerEnabled) && (
             <button 
               onClick={() => setActiveTab("briefcase-ai")}
               disabled={state === "summarizing" || briefcaseState !== "idle"}
@@ -404,7 +404,12 @@ export default function WebLLMClient({ session_id }: { session_id: string }) {
             <div className="flex justify-end mb-2">
               <button 
                 onClick={handleReset}
-                className="bg-neutral-800 hover:bg-neutral-700 text-white px-5 py-2 rounded-full text-sm font-medium transition-colors border border-white/10 flex items-center gap-2 shadow-lg"
+                disabled={state === "summarizing"}
+                className={`px-5 py-2 rounded-full text-sm font-medium transition-colors border flex items-center gap-2 shadow-lg ${
+                  state === "summarizing"
+                    ? "bg-neutral-800 text-neutral-500 border-white/5 cursor-not-allowed"
+                    : "bg-neutral-800 hover:bg-neutral-700 text-white border-white/10"
+                }`}
               >
                 🔄 Start Over
               </button>

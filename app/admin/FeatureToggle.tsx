@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import { toggleFeatureFlag } from "./actions";
 
 export function FeatureToggle({ 
   featureName, 
@@ -21,15 +21,8 @@ export function FeatureToggle({
     setIsEnabled(newState); // Optimistic UI update
 
     try {
-      const supabase = createClient();
-      const { error } = await supabase
-        .from("feature_flags")
-        .update({ is_enabled: newState })
-        .eq("feature_name", featureName);
-
-      if (error) throw error;
-      
-      router.refresh();
+      await toggleFeatureFlag(featureName, newState);
+      // Removed router.refresh() because revalidatePath is used in the action
     } catch (err) {
       console.error("Failed to update feature flag", err);
       // Revert on error
